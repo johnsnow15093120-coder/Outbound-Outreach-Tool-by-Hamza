@@ -1,4 +1,5 @@
-import React, { useState, useReducer, createContext } from 'react';
+
+import React, { useState, useReducer, createContext, useEffect } from 'react';
 import { AppState, Tool, AppContextType, ProgramSettings, ToolData } from './types';
 import { INITIAL_STATE } from './constants';
 import Sidebar from './components/Sidebar';
@@ -6,6 +7,9 @@ import ToolView from './components/ToolView';
 import { exportStyledReport } from './utils/csv';
 
 export const AppContext = createContext<AppContextType | null>(null);
+
+const LOCAL_STORAGE_KEY = 'outreachRoadmapState';
+const ACTIVE_TOOL_STORAGE_KEY = 'outreachRoadmapActiveTool';
 
 function appReducer(state: AppState, action: any): AppState {
   switch (action.type) {
@@ -73,9 +77,48 @@ function appReducer(state: AppState, action: any): AppState {
   }
 }
 
+const initializer = (initialState: AppState): AppState => {
+    try {
+        const storedStateJSON = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (storedStateJSON) {
+            return JSON.parse(storedStateJSON);
+        }
+    } catch (e) {
+        console.error('Could not load state from local storage', e);
+    }
+    return initialState;
+};
+
 const App: React.FC = () => {
-  const [state, dispatch] = useReducer(appReducer, INITIAL_STATE);
-  const [activeTool, setActiveTool] = useState<Tool>(Tool.LIO);
+  const [state, dispatch] = useReducer(appReducer, INITIAL_STATE, initializer);
+  const [activeTool, setActiveTool] = useState<Tool>(() => {
+    try {
+      const savedTool = localStorage.getItem(ACTIVE_TOOL_STORAGE_KEY);
+      if (savedTool && Object.values(Tool).includes(savedTool as Tool)) {
+        return savedTool as Tool;
+      }
+    } catch (e) {
+      console.error('Could not load active tool from local storage', e);
+    }
+    return Tool.LIO;
+  });
+
+  useEffect(() => {
+    try {
+      const stateJSON = JSON.stringify(state);
+      localStorage.setItem(LOCAL_STORAGE_KEY, stateJSON);
+    } catch (e) {
+      console.error('Could not save state to local storage', e);
+    }
+  }, [state]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVE_TOOL_STORAGE_KEY, activeTool);
+    } catch (e) {
+      console.error('Could not save active tool to local storage', e);
+    }
+  }, [activeTool]);
 
   const handleExport = () => {
     exportStyledReport(state);
